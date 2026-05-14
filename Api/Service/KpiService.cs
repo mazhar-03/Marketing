@@ -1,6 +1,5 @@
 ﻿using Api.Data;
 using Api.Data.Entities;
-using Api.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Service;
@@ -16,41 +15,51 @@ public class KpiService
 
     public async Task GenerateDailyKpis(DateTime date)
     {
-        var rawData = await _db.MetaDailyInsights
+        var rawData = await _db.PlatformDailyInsights
             .Where(x => x.Date == date)
             .ToListAsync();
 
-        var grouped = rawData
-            .GroupBy(x => x.CampaignName);
+        // Group by client + platform + campaign
+        var grouped = rawData.GroupBy(x => new
+        {
+            x.ClientId,
+            x.Platform,
+            x.CampaignName
+        });
 
         foreach (var group in grouped)
         {
+            // Skip if KPI already exists for this group
+            var exists = await _db.DailyKpis.AnyAsync(x =>
+                x.ClientId == group.Key.ClientId &&
+                x.Platform == group.Key.Platform &&
+                x.CampaignName == group.Key.CampaignName &&
+                x.Date == date);
+
+            if (exists) continue;
+
             var spend = group.Sum(x => x.Spend);
             var clicks = group.Sum(x => x.Clicks);
             var impressions = group.Sum(x => x.Impressions);
 
-            var ctr = impressions == 0 ? 0 : (decimal)clicks / impressions;
-            var cpc = clicks == 0 ? 0 : spend / clicks;
-            var cpm = clicks == 0 ? 0 : spend / impressions * 1000;
-
             var kpi = new DailyCampaignKPI
             {
-                ClientId = 1,
+                ClientId = group.Key.ClientId,
+                Platform = group.Key.Platform,
                 Date = date,
-                CampaignName = group.Key,
+                CampaignName = group.Key.CampaignName,
                 TotalSpend = spend,
                 TotalClicks = clicks,
                 TotalImpressions = impressions,
-                CTR = ctr,
-                CPC = cpc,
-                CPM = cpm
+                CTR = impressions == 0 ? 0 : Math.Round((decimal)clicks / impressions * 100, 2),
+                CPC = clicks == 0 ? 0 : Math.Round(spend / clicks, 2),
+                CPM = impressions == 0 ? 0 : Math.Round(spend / impressions * 1000, 2)
             };
 
-            _db.DailyCampaignKPIs.Add(kpi);
+            _db.DailyKpis.Add(kpi);
         }
 
         await _db.SaveChangesAsync();
-
-        Console.WriteLine("KPIs generated for " + date.ToShortDateString());
+        Console.WriteLine($"KPIs generated for {date:yyyy-MM-dd}");
     }
 }

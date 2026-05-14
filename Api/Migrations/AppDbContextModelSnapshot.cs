@@ -30,16 +30,32 @@ namespace Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("GoogleAdsCustomerId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("GoogleAdsDeveloperToken")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LinkedInAccessToken")
+                        .HasColumnType("text");
+
+                    b.Property<string>("LinkedInAdAccountId")
+                        .HasColumnType("text");
+
                     b.Property<string>("MetaAccessToken")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("MetaAdAccountId")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TikTokAccessToken")
+                        .HasColumnType("text");
+
+                    b.Property<string>("TikTokAdvertiserId")
                         .HasColumnType("text");
 
                     b.HasKey("Id");
@@ -74,6 +90,9 @@ namespace Api.Migrations
                     b.Property<DateTime>("Date")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("Platform")
+                        .HasColumnType("integer");
+
                     b.Property<long>("TotalClicks")
                         .HasColumnType("bigint");
 
@@ -85,10 +104,68 @@ namespace Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DailyCampaignKPIs");
+                    b.ToTable("DailyKpis");
                 });
 
-            modelBuilder.Entity("Api.Data.Entities.MetaDailyInsight", b =>
+            modelBuilder.Entity("Api.Data.Entities.GA4DailyInsight", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AvgSessionDuration")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("BounceRate")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("CampaignName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("ClientId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ConversionEventName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("Conversions")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("Date")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Medium")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("NewUsers")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("PageViews")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Sessions")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("TotalUsers")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.ToTable("GA4DailyInsights");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.PlatformDailyInsight", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -120,12 +197,26 @@ namespace Api.Migrations
                     b.Property<long>("Impressions")
                         .HasColumnType("bigint");
 
+                    b.Property<int>("Platform")
+                        .HasColumnType("integer");
+
                     b.Property<decimal>("Spend")
                         .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
-                    b.ToTable("MetaDailyInsights");
+                    b.ToTable("PlatformDailyInsights");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.GA4DailyInsight", b =>
+                {
+                    b.HasOne("Api.Data.Entities.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Client");
                 });
 #pragma warning restore 612, 618
         }

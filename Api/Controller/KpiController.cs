@@ -1,5 +1,5 @@
 ﻿using Api.Data;
-using Api.Data;
+using Api.Data.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,12 +16,25 @@ public class KpiController : ControllerBase
         _db = db;
     }
 
+    // GET /api/kpi
+    // GET /api/kpi?clientId=1
+    // GET /api/kpi?clientId=1&platform=Meta
     [HttpGet]
-    public IActionResult Get()
+    public async Task<IActionResult> Get(
+        [FromQuery] int? clientId,
+        [FromQuery] AdPlatform? platform)
     {
-        var data = _db.DailyCampaignKPIs
+        var query = _db.DailyKpis.AsQueryable();
+
+        if (clientId.HasValue)
+            query = query.Where(x => x.ClientId == clientId);
+
+        if (platform.HasValue)
+            query = query.Where(x => x.Platform == platform);
+
+        var data = await query
             .OrderByDescending(x => x.Date)
-            .ToList();
+            .ToListAsync();
 
         return Ok(data);
     }
