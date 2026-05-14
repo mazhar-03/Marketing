@@ -3,6 +3,7 @@ using System;
 using Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260514115159_InitialCreate")]
+    partial class InitialCreate
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,12 +32,6 @@ namespace Api.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("GA4PropertyId")
-                        .HasColumnType("text");
-
-                    b.Property<string>("GA4ServiceAccountJson")
-                        .HasColumnType("text");
 
                     b.Property<string>("GoogleAdsCustomerId")
                         .HasColumnType("text");
@@ -113,64 +110,6 @@ namespace Api.Migrations
                     b.ToTable("DailyKpis");
                 });
 
-            modelBuilder.Entity("Api.Data.Entities.GA4DailyInsight", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<decimal>("AvgSessionDuration")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("BounceRate")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("CampaignName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("ClientId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ConversionEventName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<long>("Conversions")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime>("Date")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Medium")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<long>("NewUsers")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("PageViews")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("Sessions")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<long>("TotalUsers")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClientId");
-
-                    b.ToTable("GA4DailyInsights");
-                });
-
             modelBuilder.Entity("Api.Data.Entities.PlatformDailyInsight", b =>
                 {
                     b.Property<int>("Id")
@@ -212,17 +151,6 @@ namespace Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("PlatformDailyInsights");
-                });
-
-            modelBuilder.Entity("Api.Data.Entities.GA4DailyInsight", b =>
-                {
-                    b.HasOne("Api.Data.Entities.Client", "Client")
-                        .WithMany()
-                        .HasForeignKey("ClientId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Client");
                 });
 #pragma warning restore 612, 618
         }

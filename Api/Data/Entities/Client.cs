@@ -20,4 +20,8 @@ public class Client
     // LinkedIn
     public string? LinkedInAdAccountId { get; set; }
     public string? LinkedInAccessToken { get; set; }
+
+    // GA4
+    public string? GA4PropertyId { get; set; }           
+    public string? GA4ServiceAccountJson { get; set; }   // service account key JSON
 }

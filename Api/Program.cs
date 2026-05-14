@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.Service;
+using Api.Service.Connectors;
 using Hangfire;
 using Hangfire.MemoryStorage;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<FakeDataService>();
 builder.Services.AddScoped<KpiService>();
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<IPlatformConnector, MetaConnector>();
+builder.Services.AddScoped<IPlatformConnector, GoogleAdsConnector>();
+builder.Services.AddScoped<IPlatformConnector, TikTokConnector>();
+builder.Services.AddScoped<IPlatformConnector, LinkedInConnector>();
+builder.Services.AddScoped<DataIngestionService>();
 
 builder.Services.AddHangfire(config => config.UseMemoryStorage());
 builder.Services.AddHangfireServer();
@@ -46,6 +53,12 @@ using (var scope = app.Services.CreateScope())
         "daily-kpi-job",
         service => service.GenerateDailyKpis(DateTime.UtcNow.Date),
         "0 10 8 * * *"  // every day at 08:10
+    );
+    
+    jobManager.AddOrUpdate<DataIngestionService>(
+        "data-ingestion-job",
+        service => service.RunAsync(),
+        "0 0 8 * * *"
     );
 }
 

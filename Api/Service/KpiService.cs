@@ -58,6 +58,9 @@ public class KpiService
 
             _db.DailyKpis.Add(kpi);
         }
+        
+        // when is pecified the date range iin forntend when i built the UI for ex can my data shows the cpc on the specified date range, or sumof clicks, spendings...
+        //may be i can create saving column for the 
 
         await _db.SaveChangesAsync();
         Console.WriteLine($"KPIs generated for {date:yyyy-MM-dd}");

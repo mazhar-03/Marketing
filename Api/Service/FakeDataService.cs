@@ -108,4 +108,10 @@ public class FakeDataService
 
         Console.WriteLine($"[GA4] Generated fake data for {client.Name}");
     }
+    
+    public async Task GeneratePlatformDataForClient(Client client, AdPlatform platform, DateTime date)
+    {
+        // mevcut GenerateAdPlatformData metodunun içeriği buraya
+        // sadece tek bir platform için çalışacak şekilde
+    }
 }
