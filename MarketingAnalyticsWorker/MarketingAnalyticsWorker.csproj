@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>dotnet-MarketingAnalyticsWorker-96473e24-b2ed-4c71-8b35-284df69f224b</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Hangfire" Version="1.8.23" />
+        <PackageReference Include="Hangfire.AspNetCore" Version="1.8.23" />
+        <PackageReference Include="Hangfire.MemoryStorage" Version="1.8.1.2" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.15">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1"/>
+        <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+        <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.1.7" />
+        <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.1.7" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Config\" />
+      <Folder Include="Jobs\" />
+    </ItemGroup>
+</Project>
