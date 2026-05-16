@@ -77,6 +77,14 @@ namespace Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AdName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AdsetName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<decimal>("CPC")
                         .HasColumnType("numeric");
 

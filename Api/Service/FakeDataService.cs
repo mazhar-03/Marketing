@@ -27,7 +27,7 @@ public class FakeDataService
         foreach (var client in clients)
         {
             await GenerateAdPlatformData(client, today);
-            await GenerateGA4Data(client, today);
+            await GenerateGA4DataForClient(client, today);
         }
 
         await _db.SaveChangesAsync();
@@ -69,7 +69,7 @@ public class FakeDataService
         }
     }
 
-    private async Task GenerateGA4Data(Client client, DateTime date)
+    public async Task GenerateGA4DataForClient(Client client, DateTime date)
     {
         var exists = await _db.GA4DailyInsights
             .AnyAsync(x => x.ClientId == client.Id && x.Date == date);
@@ -113,5 +113,82 @@ public class FakeDataService
     {
         // mevcut GenerateAdPlatformData metodunun içeriği buraya
         // sadece tek bir platform için çalışacak şekilde
+    }
+    
+    public async Task SeedAsync()
+    {
+        var clients = await _db.Clients.ToListAsync();
+
+        var campaigns = new[]
+        {
+            "Brand Awareness",
+            "Summer Sale",
+            "Retargeting",
+            "Lead Generation",
+            "Black Friday"
+        };
+
+        var adsets = new[]
+        {
+            "Cold Audience",
+            "Warm Audience",
+            "Remarketing",
+            "Lookalike 1%",
+            "Interest Targeting"
+        };
+
+        var ads = new[]
+        {
+            "Video Ad A",
+            "Image Ad B",
+            "Carousel Ad C",
+            "Banner Ad D",
+            "Reels Ad E"
+        };
+
+        var startDate = DateTime.UtcNow.AddDays(-14);
+
+        foreach (var client in clients)
+        {
+            for (int day = 0; day < 14; day++)
+            {
+                var date = startDate.AddDays(day);
+
+                foreach (var campaign in campaigns)
+                foreach (var adset in adsets)
+                foreach (var ad in ads)
+                {
+                    var spend = Math.Round((decimal)(_random.NextDouble() * 200), 2);
+                    var clicks = _random.Next(0, 500);
+                    var impressions = _random.Next(500, 20000);
+
+                    if (impressions == 0) continue;
+
+                    var ctr = (decimal)clicks / impressions * 100;
+                    var cpc = clicks == 0 ? 0 : spend / clicks;
+                    var cpm = spend / impressions * 1000;
+
+                    _db.DailyKpis.Add(new DailyCampaignKPI
+                    {
+                        ClientId = client.Id,
+                        Platform = AdPlatform.GoogleAds,
+                        Date = date,
+                        CampaignName = campaign,
+                        AdsetName = adset,
+                        AdName = ad,
+                        TotalSpend = spend,
+                        TotalClicks = clicks,
+                        TotalImpressions = impressions,
+                        CTR = Math.Round(ctr, 2),
+                        CPC = Math.Round(cpc, 2),
+                        CPM = Math.Round(cpm, 2)
+                    });
+                }
+            }
+        }
+
+        await _db.SaveChangesAsync();
+
+        Console.WriteLine("Fake KPI data generated successfully.");
     }
 }

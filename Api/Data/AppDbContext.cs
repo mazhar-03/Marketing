@@ -14,4 +14,5 @@ public class AppDbContext : DbContext
     public DbSet<PlatformDailyInsight> PlatformDailyInsights { get; set; }
     public DbSet<DailyCampaignKPI> DailyKpis { get; set; }
     public DbSet<GA4DailyInsight> GA4DailyInsights { get; set; }
+    public Client Client { get; set; } // bunu ekle
 }

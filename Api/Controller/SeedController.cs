@@ -20,8 +20,20 @@ public class SeedController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Seed()
     {
+        if (!HttpContext.RequestServices
+                .GetRequiredService<IWebHostEnvironment>()
+                .IsDevelopment())
+            return Forbid();
+        
         await _fakeData.GenerateAndSaveAsync();
         await _kpi.GenerateDailyKpis(DateTime.UtcNow.Date);
         return Ok("Seeded successfully.");
+    }
+    
+    [HttpPost("seed-kpis")]
+    public async Task<IActionResult> SeedGoogle()
+    {
+        await _fakeData.SeedAsync();
+        return Ok("Seed completed");
     }
 }

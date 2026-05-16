@@ -15,26 +15,39 @@ public class KpiService
 
     public async Task GenerateDailyKpis(DateTime date)
     {
+        var nextDate = date.AddDays(1);
+
         var rawData = await _db.PlatformDailyInsights
-            .Where(x => x.Date == date)
+            .Where(x =>
+                x.Platform == AdPlatform.GoogleAds &&
+                x.Date >= date &&
+                x.Date < nextDate)
             .ToListAsync();
 
-        // Group by client + platform + campaign
+        var existing = await _db.DailyKpis
+            .Where(x =>
+                x.Platform == AdPlatform.GoogleAds &&
+                x.Date >= date &&
+                x.Date < nextDate)
+            .ToListAsync();
+
         var grouped = rawData.GroupBy(x => new
         {
             x.ClientId,
             x.Platform,
-            x.CampaignName
+            x.CampaignName,
+            x.AdsetName,
+            x.AdName
         });
 
         foreach (var group in grouped)
         {
-            // Skip if KPI already exists for this group
-            var exists = await _db.DailyKpis.AnyAsync(x =>
+            var exists = existing.Any(x =>
                 x.ClientId == group.Key.ClientId &&
                 x.Platform == group.Key.Platform &&
                 x.CampaignName == group.Key.CampaignName &&
-                x.Date == date);
+                x.AdsetName == group.Key.AdsetName &&
+                x.AdName == group.Key.AdName);
 
             if (exists) continue;
 
@@ -42,27 +55,22 @@ public class KpiService
             var clicks = group.Sum(x => x.Clicks);
             var impressions = group.Sum(x => x.Impressions);
 
-            var kpi = new DailyCampaignKPI
+            _db.DailyKpis.Add(new DailyCampaignKPI
             {
                 ClientId = group.Key.ClientId,
                 Platform = group.Key.Platform,
                 Date = date,
                 CampaignName = group.Key.CampaignName,
+                AdsetName = group.Key.AdsetName,
+                AdName = group.Key.AdName,
                 TotalSpend = spend,
                 TotalClicks = clicks,
                 TotalImpressions = impressions,
-                CTR = impressions == 0 ? 0 : Math.Round((decimal)clicks / impressions * 100, 2),
-                CPC = clicks == 0 ? 0 : Math.Round(spend / clicks, 2),
-                CPM = impressions == 0 ? 0 : Math.Round(spend / impressions * 1000, 2)
-            };
-
-            _db.DailyKpis.Add(kpi);
+                CTR = impressions == 0 ? 0 : (decimal)clicks / impressions * 100,
+                CPC = clicks == 0 ? 0 : spend / clicks,
+                CPM = impressions == 0 ? 0 : spend / impressions * 1000
+            });
         }
-        
-        // when is pecified the date range iin forntend when i built the UI for ex can my data shows the cpc on the specified date range, or sumof clicks, spendings...
-        //may be i can create saving column for the 
 
         await _db.SaveChangesAsync();
-        Console.WriteLine($"KPIs generated for {date:yyyy-MM-dd}");
-    }
-}
+    }}
