@@ -28,7 +28,7 @@ public class GA4IngestionService
                     string.IsNullOrEmpty(client.GA4ServiceAccountJson))
                 {
                     Console.WriteLine($"[GA4] {client.Name} — no credentials, using fake data");
-                    await _fakeData.GenerateGA4DataForClient(client, today);
+                    // await _fakeData.GenerateGA4DataForClient(client, today);
                     continue;
                 }
 
@@ -41,7 +41,7 @@ public class GA4IngestionService
             catch (NotImplementedException)
             {
                 Console.WriteLine($"[GA4] {client.Name} — not implemented yet, using fake data");
-                await _fakeData.GenerateGA4DataForClient(client, today);
+                // await _fakeData.GenerateGA4DataForClient(client, today);
             }
             catch (Exception ex)
             {

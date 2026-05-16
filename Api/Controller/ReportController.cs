@@ -14,19 +14,19 @@ public class ReportController : ControllerBase
         _reportService = reportService;
     }
 
-    // GET /api/clients/1/report/weekly?week=2026-05-12
-    // If no week provided, defaults to last Monday
+    // GET /api/clients/1/report/weekly?week=2026-05-12&markup=1.5
     [HttpGet("weekly")]
     public async Task<IActionResult> GetWeeklyReport(
         int clientId,
-        [FromQuery] DateTime? week)
+        [FromQuery] DateTime? week,
+        [FromQuery] decimal markup = 1)
     {
-        // Default to last Monday
         var weekStart = week?.Date ?? GetLastMonday();
+        weekStart = DateTime.SpecifyKind(weekStart, DateTimeKind.Utc);
 
-        var pdfBytes = await _reportService.GenerateWeeklyReportAsync(clientId, weekStart);
+        var pdfBytes = await _reportService.GenerateWeeklyReportAsync(clientId, weekStart, markup);
 
-        var fileName = $"google-ads-report_{weekStart:yyyy-MM-dd}.pdf";
+        var fileName = $"google-ads-report_{weekStart:yyyy-MM-dd}_markup{markup}.pdf";
         return File(pdfBytes, "application/pdf", fileName);
     }
 

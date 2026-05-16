@@ -25,7 +25,7 @@ public class SeedController : ControllerBase
                 .IsDevelopment())
             return Forbid();
         
-        await _fakeData.GenerateAndSaveAsync();
+        await _fakeData.SeedAsync();
         await _kpi.GenerateDailyKpis(DateTime.UtcNow.Date);
         return Ok("Seeded successfully.");
     }

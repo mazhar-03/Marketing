@@ -54,6 +54,17 @@ public class KpiService
             var spend = group.Sum(x => x.Spend);
             var clicks = group.Sum(x => x.Clicks);
             var impressions = group.Sum(x => x.Impressions);
+            var views = group.Sum(x => x.Views); // Yeni
+            var conversions = group.Sum(x => x.Conversions); // Yeni
+            var conversionValue = group.Sum(x => x.ConversionValue); // Yeni
+
+// Güvenli hesaplamalar (Sıfıra bölünme hatasını engelliyoruz)
+            var ctr = impressions > 0 ? ((decimal)clicks / impressions) * 100 : 0;
+            var cpc = clicks > 0 ? (spend / clicks) : 0;
+            var cpm = impressions > 0 ? ((spend / impressions) * 1000) : 0;
+            var cpv = views > 0 ? (spend / views) : 0;
+            var cpa = conversions > 0 ? (spend / conversions) : 0;
+            var roas = spend > 0 ? (conversionValue / spend) : 0;
 
             _db.DailyKpis.Add(new DailyCampaignKPI
             {
@@ -66,9 +77,20 @@ public class KpiService
                 TotalSpend = spend,
                 TotalClicks = clicks,
                 TotalImpressions = impressions,
-                CTR = impressions == 0 ? 0 : (decimal)clicks / impressions * 100,
-                CPC = clicks == 0 ? 0 : spend / clicks,
-                CPM = impressions == 0 ? 0 : spend / impressions * 1000
+                TotalViews = views,
+                TotalConversions = conversions,
+                ConversionValue = conversionValue,
+    
+                // Yüzde ve Para birimlerini genelde virgülden sonra 2 hane (Round) tutmak arayüzde rahatlatır
+                CTR = Math.Round(ctr, 2),
+                CPC = Math.Round(cpc, 2),
+                CPM = Math.Round(cpm, 2),
+                CPV = Math.Round(cpv, 2),
+                CPA = Math.Round(cpa, 2),
+                ROAS = Math.Round(roas, 2),
+    
+                // EĞER API'den Conversion details çekersen buraya mapleyebilirsin
+                ConversionDetails = new Dictionary<string, decimal>() // Fake datada burayı dolduracağız
             });
         }
 

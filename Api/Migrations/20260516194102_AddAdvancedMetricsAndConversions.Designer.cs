@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260516194102_AddAdvancedMetricsAndConversions")]
+    partial class AddAdvancedMetricsAndConversions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -218,35 +221,57 @@ namespace Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<decimal>("CPA")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("CPC")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("CPM")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("CPV")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("CTR")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("CampaignName")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<long>("Clicks")
-                        .HasColumnType("bigint");
-
                     b.Property<int>("ClientId")
                         .HasColumnType("integer");
 
-                    b.Property<decimal>("ConversionValue")
-                        .HasColumnType("numeric");
+                    b.Property<Dictionary<string, decimal>>("ConversionDetails")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
 
-                    b.Property<decimal>("Conversions")
+                    b.Property<decimal>("ConversionValue")
                         .HasColumnType("numeric");
 
                     b.Property<DateTime>("Date")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<long>("Impressions")
-                        .HasColumnType("bigint");
-
                     b.Property<int>("Platform")
                         .HasColumnType("integer");
 
-                    b.Property<decimal>("Spend")
+                    b.Property<decimal>("ROAS")
                         .HasColumnType("numeric");
 
-                    b.Property<long>("Views")
+                    b.Property<long>("TotalClicks")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("TotalConversions")
+                        .HasColumnType("numeric");
+
+                    b.Property<long>("TotalImpressions")
+                        .HasColumnType("bigint");
+
+                    b.Property<decimal>("TotalSpend")
+                        .HasColumnType("numeric");
+
+                    b.Property<long>("TotalViews")
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");

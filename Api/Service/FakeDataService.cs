@@ -9,141 +9,37 @@ public class FakeDataService
     private readonly AppDbContext _db;
     private readonly Random _random = new();
 
-    private readonly string[] _sources = { "google", "facebook", "tiktok", "direct", "linkedin" };
-    private readonly string[] _mediums = { "cpc", "organic", "referral", "email" };
-    private readonly string[] _campaigns = { "brand_awareness", "retargeting", "summer_sale", "lead_gen" };
-    private readonly string[] _conversionEvents = { "purchase", "lead", "signup", "add_to_cart" };
-
     public FakeDataService(AppDbContext db)
     {
         _db = db;
     }
 
-    public async Task GenerateAndSaveAsync()
-    {
-        var today = DateTime.UtcNow.Date;
-        var clients = await _db.Clients.ToListAsync();
-
-        foreach (var client in clients)
-        {
-            await GenerateAdPlatformData(client, today);
-            await GenerateGA4DataForClient(client, today);
-        }
-
-        await _db.SaveChangesAsync();
-    }
-
-    private async Task GenerateAdPlatformData(Client client, DateTime date)
-    {
-        foreach (var platform in Enum.GetValues<AdPlatform>())
-        {
-            var exists = await _db.PlatformDailyInsights
-                .AnyAsync(x => x.ClientId == client.Id
-                            && x.Platform == platform
-                            && x.Date == date);
-
-            if (exists)
-            {
-                Console.WriteLine($"[{platform}] {client.Name} — already exists, skipping");
-                continue;
-            }
-
-            var campaignCount = _random.Next(2, 5);
-            for (int i = 0; i < campaignCount; i++)
-            {
-                _db.PlatformDailyInsights.Add(new PlatformDailyInsight
-                {
-                    ClientId = client.Id,
-                    Platform = platform,
-                    Date = date,
-                    CampaignName = $"{platform} Campaign {_random.Next(1, 6)}",
-                    AdsetName = $"Adset {_random.Next(1, 4)}",
-                    AdName = $"Ad {_random.Next(1, 10)}",
-                    Spend = Math.Round((decimal)(_random.NextDouble() * 500), 2),
-                    Impressions = _random.Next(1000, 100000),
-                    Clicks = _random.Next(10, 5000)
-                });
-            }
-
-            Console.WriteLine($"[{platform}] Generated fake data for {client.Name}");
-        }
-    }
-
-    public async Task GenerateGA4DataForClient(Client client, DateTime date)
-    {
-        var exists = await _db.GA4DailyInsights
-            .AnyAsync(x => x.ClientId == client.Id && x.Date == date);
-
-        if (exists)
-        {
-            Console.WriteLine($"[GA4] {client.Name} — already exists, skipping");
-            return;
-        }
-
-        // Multiple rows per day — one per source/medium combo
-        var rows = _random.Next(3, 7);
-        for (int i = 0; i < rows; i++)
-        {
-            var sessions = _random.Next(100, 5000);
-            var totalUsers = (long)(sessions * (_random.NextDouble() * 0.9 + 0.1));
-            var newUsers = (long)(totalUsers * (_random.NextDouble() * 0.6 + 0.2));
-
-            _db.GA4DailyInsights.Add(new GA4DailyInsight
-            {
-                ClientId = client.Id,
-                Date = date,
-                Sessions = sessions,
-                TotalUsers = totalUsers,
-                NewUsers = newUsers,
-                BounceRate = Math.Round((decimal)(_random.NextDouble() * 0.6 + 0.2), 4),
-                AvgSessionDuration = Math.Round((decimal)(_random.NextDouble() * 180 + 30), 2),
-                PageViews = _random.Next(sessions, sessions * 5),
-                Source = _sources[_random.Next(_sources.Length)],
-                Medium = _mediums[_random.Next(_mediums.Length)],
-                CampaignName = _campaigns[_random.Next(_campaigns.Length)],
-                Conversions = _random.Next(0, 200),
-                ConversionEventName = _conversionEvents[_random.Next(_conversionEvents.Length)]
-            });
-        }
-
-        Console.WriteLine($"[GA4] Generated fake data for {client.Name}");
-    }
-    
-    public async Task GeneratePlatformDataForClient(Client client, AdPlatform platform, DateTime date)
-    {
-        // mevcut GenerateAdPlatformData metodunun içeriği buraya
-        // sadece tek bir platform için çalışacak şekilde
-    }
-    
-    public async Task SeedAsync()
+public async Task SeedAsync()
     {
         var clients = await _db.Clients.ToListAsync();
 
-        var campaigns = new[]
-        {
-            "Brand Awareness",
-            "Summer Sale",
-            "Retargeting",
-            "Lead Generation",
-            "Black Friday"
+        // Sadece 3 Kampanya
+        var campaigns = new[] 
+        { 
+            "Brand Awareness", 
+            "Summer Sale", 
+            "Retargeting" 
         };
 
-        var adsets = new[]
-        {
-            "Cold Audience",
-            "Warm Audience",
-            "Remarketing",
-            "Lookalike 1%",
-            "Interest Targeting"
+        // Her kampanyada 3 Adset
+        var adsets = new[] 
+        { 
+            "Cold Audience", 
+            "Warm Audience", 
+            "Remarketing" 
         };
 
-        var ads = new[]
-        {
-            "Video Ad A",
-            "Image Ad B",
-            "Carousel Ad C",
-            "Banner Ad D",
-            "Reels Ad E"
+        // Her adsette 3 Ad
+        var ads = new[] 
+        { 
+            "Video Ad A", 
+            "Image Ad B", 
+            "Carousel Ad C" 
         };
 
         var startDate = DateTime.UtcNow.AddDays(-14);
@@ -158,16 +54,54 @@ public class FakeDataService
                 foreach (var adset in adsets)
                 foreach (var ad in ads)
                 {
-                    var spend = Math.Round((decimal)(_random.NextDouble() * 200), 2);
-                    var clicks = _random.Next(0, 500);
+                    // === 1. HAM VERİLERİN ÜRETİLMESİ ===
+                    var spend = Math.Round((decimal)(_random.NextDouble() * 200 + 10), 2);
                     var impressions = _random.Next(500, 20000);
-
                     if (impressions == 0) continue;
 
-                    var ctr = (decimal)clicks / impressions * 100;
-                    var cpc = clicks == 0 ? 0 : spend / clicks;
-                    var cpm = spend / impressions * 1000;
+                    var clicks = _random.Next(1, (int)(impressions * 0.1) + 2); 
+                    var isVideo = ad.Contains("Video") || ad.Contains("Reels");
+                    var views = isVideo ? _random.Next(clicks, impressions) : 0;
+                    var totalConversions = Math.Round((decimal)(_random.NextDouble() * (clicks * 0.15)), 2);
+                    var conversionValue = Math.Round(totalConversions * (decimal)(_random.NextDouble() * 130 + 20), 2);
 
+                    // === 2. HAM VERİ TABLOSUNA EKLEME (PlatformDailyInsights) ===
+                    _db.PlatformDailyInsights.Add(new PlatformDailyInsight
+                    {
+                        ClientId = client.Id,
+                        Platform = AdPlatform.GoogleAds,
+                        Date = date,
+                        CampaignName = campaign,
+                        AdsetName = adset,
+                        AdName = ad,
+                        Spend = spend,
+                        Impressions = impressions,
+                        Clicks = clicks,
+                        Views = views,
+                        Conversions = totalConversions,
+                        ConversionValue = conversionValue
+                    });
+
+                    // === 3. ORANLARIN HESAPLANMASI ===
+                    var ctr = impressions > 0 ? ((decimal)clicks / impressions) * 100 : 0;
+                    var cpc = clicks > 0 ? (spend / clicks) : 0;
+                    var cpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
+                    var cpv = views > 0 ? (spend / views) : 0;
+                    var cpa = totalConversions > 0 ? (spend / totalConversions) : 0;
+                    var roas = spend > 0 ? (conversionValue / spend) : 0;
+
+                    var conversionDetails = new Dictionary<string, decimal>();
+                    if (totalConversions > 0)
+                    {
+                        var weightPurchase = (decimal)_random.NextDouble();
+                        var weightLead = (decimal)_random.NextDouble();
+                        var totalWeight = weightPurchase + weightLead;
+
+                        conversionDetails.Add("Purchase", Math.Round(totalConversions * (weightPurchase / totalWeight), 2));
+                        conversionDetails.Add("Lead", Math.Round(totalConversions * (weightLead / totalWeight), 2));
+                    }
+
+                    // === 4. RAPOR TABLOSUNA EKLEME (DailyKpis) ===
                     _db.DailyKpis.Add(new DailyCampaignKPI
                     {
                         ClientId = client.Id,
@@ -179,16 +113,25 @@ public class FakeDataService
                         TotalSpend = spend,
                         TotalClicks = clicks,
                         TotalImpressions = impressions,
+                        TotalViews = views,
+                        TotalConversions = totalConversions,
+                        ConversionValue = conversionValue,
+                        ConversionDetails = conversionDetails,
                         CTR = Math.Round(ctr, 2),
                         CPC = Math.Round(cpc, 2),
-                        CPM = Math.Round(cpm, 2)
+                        CPM = Math.Round(cpm, 2),
+                        CPV = Math.Round(cpv, 2),
+                        CPA = Math.Round(cpa, 2),
+                        ROAS = Math.Round(roas, 2)
                     });
                 }
             }
         }
 
         await _db.SaveChangesAsync();
-
-        Console.WriteLine("Fake KPI data generated successfully.");
+        Console.WriteLine("Data seeded successfully with 3x3x3 structure.");
     }
+
+// (GenerateAndSaveAsync, GenerateGA4DataForClient gibi mevcut diğer metotların
+    // aynen burada kalmaya devam edebilir, ben odaklanman için sadece SeedAsync kısmını değiştirdim.)
 }

@@ -6,6 +6,7 @@ using Hangfire;
 using Hangfire.MemoryStorage;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Infrastructure;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 QuestPDF.Settings.License = LicenseType.Community;
@@ -13,9 +14,25 @@ QuestPDF.Settings.License = LicenseType.Community;
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowNextJs", policy =>
+    {
+        policy.AllowAnyOrigin() // Test ortamı için herkese açık yapıyoruz
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
+var dataSourceBuilder = new NpgsqlDataSourceBuilder(builder.Configuration.GetConnectionString("DefaultConnection"));
+dataSourceBuilder.EnableDynamicJson();
+var dataSource = dataSourceBuilder.Build();
+
+// DbContext'i bu ayarlı DataSource ile başlatıyoruz
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(dataSource));
+
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 builder.Services.AddScoped<FakeDataService>();
 builder.Services.AddScoped<KpiService>();
@@ -41,6 +58,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
+app.UseCors("AllowNextJs"); // Bunu MapControllers'dan önceye koy!
 
 app.UseHttpsRedirection();
 app.UseHangfireDashboard("/hangfire");
@@ -53,7 +71,7 @@ using (var scope = app.Services.CreateScope())
 
     jobManager.AddOrUpdate<FakeDataService>(
         "fake-data-job",
-        service => service.GenerateAndSaveAsync(),
+        service => service.SeedAsync(),
         "0 0 8 * * *"  // every day at 08:00
     );
     

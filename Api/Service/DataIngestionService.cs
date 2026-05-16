@@ -43,7 +43,7 @@ public class DataIngestionService
                 {
                     // Connector not ready yet — fall back to fake data
                     Console.WriteLine($"[{connector.Platform}] Not implemented — using fake data for {client.Name}");
-                    await _fakeData.GeneratePlatformDataForClient(client, connector.Platform, today);
+                    // await _fakeData.GeneratePlatformDataForClient(client, connector.Platform, today);
                 }
                 catch (Exception ex)
                 {
