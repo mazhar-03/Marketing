@@ -32,8 +32,8 @@ public class InsightsController : ControllerBase
 
         var query = _db.PlatformDailyInsights
             .Where(x => x.ClientId == clientId
-                     && x.Date >= fromDate
-                     && x.Date <= toDate);
+                        && x.Date >= fromDate
+                        && x.Date <= toDate);
 
         if (platform.HasValue)
             query = query.Where(x => x.Platform == platform);
@@ -62,8 +62,8 @@ public class InsightsController : ControllerBase
 
         var query = _db.GA4DailyInsights
             .Where(x => x.ClientId == clientId
-                     && x.Date >= fromDate
-                     && x.Date <= toDate);
+                        && x.Date >= fromDate
+                        && x.Date <= toDate);
 
         if (!string.IsNullOrEmpty(source))
             query = query.Where(x => x.Source == source);
@@ -94,8 +94,8 @@ public class InsightsController : ControllerBase
         // Paid media summary per platform
         var kpis = await _db.DailyKpis
             .Where(x => x.ClientId == clientId
-                     && x.Date >= fromDate
-                     && x.Date <= toDate)
+                        && x.Date >= fromDate
+                        && x.Date <= toDate)
             .ToListAsync();
 
         var platformSummaries = kpis
@@ -110,33 +110,35 @@ public class InsightsController : ControllerBase
                 AvgCPC = Math.Round(g.Average(x => x.CPC), 2),
                 AvgCPM = Math.Round(g.Average(x => x.CPM), 2),
                 TopCampaign = g.GroupBy(x => x.CampaignName)
-                               .OrderByDescending(c => c.Sum(x => x.TotalSpend))
-                               .Select(c => c.Key)
-                               .FirstOrDefault()
+                    .OrderByDescending(c => c.Sum(x => x.TotalSpend))
+                    .Select(c => c.Key)
+                    .FirstOrDefault()
             })
             .ToList();
 
         // GA4 summary
         var ga4 = await _db.GA4DailyInsights
             .Where(x => x.ClientId == clientId
-                     && x.Date >= fromDate
-                     && x.Date <= toDate)
+                        && x.Date >= fromDate
+                        && x.Date <= toDate)
             .ToListAsync();
 
-        var ga4Summary = ga4.Any() ? new
-        {
-            TotalSessions = ga4.Sum(x => x.Sessions),
-            TotalUsers = ga4.Sum(x => x.TotalUsers),
-            TotalNewUsers = ga4.Sum(x => x.NewUsers),
-            TotalPageViews = ga4.Sum(x => x.PageViews),
-            TotalConversions = ga4.Sum(x => x.Conversions),
-            AvgBounceRate = Math.Round(ga4.Average(x => x.BounceRate) * 100, 2),
-            AvgSessionDuration = Math.Round(ga4.Average(x => x.AvgSessionDuration), 0),
-            TopSource = ga4.GroupBy(x => x.Source)
-                           .OrderByDescending(g => g.Sum(x => x.Sessions))
-                           .Select(g => g.Key)
-                           .FirstOrDefault()
-        } : null;
+        var ga4Summary = ga4.Any()
+            ? new
+            {
+                TotalSessions = ga4.Sum(x => x.Sessions),
+                TotalUsers = ga4.Sum(x => x.TotalUsers),
+                TotalNewUsers = ga4.Sum(x => x.NewUsers),
+                TotalPageViews = ga4.Sum(x => x.PageViews),
+                TotalConversions = ga4.Sum(x => x.Conversions),
+                AvgBounceRate = Math.Round(ga4.Average(x => x.BounceRate) * 100, 2),
+                AvgSessionDuration = Math.Round(ga4.Average(x => x.AvgSessionDuration), 0),
+                TopSource = ga4.GroupBy(x => x.Source)
+                    .OrderByDescending(g => g.Sum(x => x.Sessions))
+                    .Select(g => g.Key)
+                    .FirstOrDefault()
+            }
+            : null;
 
         return Ok(new
         {
@@ -165,8 +167,8 @@ public class InsightsController : ControllerBase
 
         var query = _db.DailyKpis
             .Where(x => x.ClientId == clientId
-                     && x.Date >= fromDate
-                     && x.Date <= toDate);
+                        && x.Date >= fromDate
+                        && x.Date <= toDate);
 
         if (platform.HasValue)
             query = query.Where(x => x.Platform == platform);

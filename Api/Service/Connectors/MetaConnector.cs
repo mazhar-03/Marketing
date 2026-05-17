@@ -1,17 +1,17 @@
-﻿namespace Api.Service.Connectors;
+﻿using Api.Data.Entities;
 
-using Data.Entities;
+namespace Api.Service.Connectors;
 
 public class MetaConnector : IPlatformConnector
 {
     private readonly HttpClient _http;
 
-    public AdPlatform Platform => AdPlatform.Meta;
-
     public MetaConnector(HttpClient http)
     {
         _http = http;
     }
+
+    public AdPlatform Platform => AdPlatform.Meta;
 
     public Task<List<PlatformDailyInsight>> FetchInsightsAsync(Client client, DateTime date)
     {

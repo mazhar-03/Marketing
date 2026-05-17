@@ -1,5 +1,4 @@
 ﻿using Api.Data;
-using Api.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Service;
@@ -21,7 +20,6 @@ public class GA4IngestionService
         var clients = await _db.Clients.ToListAsync();
 
         foreach (var client in clients)
-        {
             try
             {
                 if (string.IsNullOrEmpty(client.GA4PropertyId) ||
@@ -47,7 +45,6 @@ public class GA4IngestionService
             {
                 Console.WriteLine($"[GA4] ERROR for {client.Name}: {ex.Message}");
             }
-        }
 
         await _db.SaveChangesAsync();
     }

@@ -14,19 +14,25 @@ public class ReportController : ControllerBase
         _reportService = reportService;
     }
 
-    // GET /api/clients/1/report/weekly?week=2026-05-12&markup=1.5
+    // GET /api/clients/1/report/weekly?week=2026-05-10&markup=1.5&metrics=totalSpend,totalClicks,ctr,roas
     [HttpGet("weekly")]
     public async Task<IActionResult> GetWeeklyReport(
         int clientId,
         [FromQuery] DateTime? week,
-        [FromQuery] decimal markup = 1)
+        [FromQuery] decimal markup = 1,
+        [FromQuery] string? metrics = null)
     {
         var weekStart = week?.Date ?? GetLastMonday();
         weekStart = DateTime.SpecifyKind(weekStart, DateTimeKind.Utc);
 
-        var pdfBytes = await _reportService.GenerateWeeklyReportAsync(clientId, weekStart, markup);
+        // Parse selected metrics — fallback to defaults if not provided
+        var selectedMetrics = string.IsNullOrEmpty(metrics)
+            ? new List<string> { "totalSpend", "totalClicks", "totalImpressions", "totalConversions" }
+            : metrics.Split(",").Select(m => m.Trim()).ToList();
 
-        var fileName = $"google-ads-report_{weekStart:yyyy-MM-dd}_markup{markup}.pdf";
+        var pdfBytes = await _reportService.GenerateWeeklyReportAsync(clientId, weekStart, markup, selectedMetrics);
+
+        var fileName = $"google-ads-report_{weekStart:yyyy-MM-dd}.pdf";
         return File(pdfBytes, "application/pdf", fileName);
     }
 

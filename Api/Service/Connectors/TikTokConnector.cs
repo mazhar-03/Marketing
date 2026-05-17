@@ -5,14 +5,14 @@ namespace Api.Service.Connectors;
 public class TikTokConnector : IPlatformConnector
 {
     private readonly HttpClient _http;
- 
-    public AdPlatform Platform => AdPlatform.TikTok;
- 
+
     public TikTokConnector(HttpClient http)
     {
         _http = http;
     }
- 
+
+    public AdPlatform Platform => AdPlatform.TikTok;
+
     public Task<List<PlatformDailyInsight>> FetchInsightsAsync(Client client, DateTime date)
     {
         // TODO: implement when token is available

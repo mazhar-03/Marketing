@@ -5,7 +5,7 @@ namespace Api.Service.Connectors;
 public class GoogleAdsConnector : IPlatformConnector
 {
     public AdPlatform Platform => AdPlatform.GoogleAds;
- 
+
     public Task<List<PlatformDailyInsight>> FetchInsightsAsync(Client client, DateTime date)
     {
         // TODO: implement when OAuth credentials are available

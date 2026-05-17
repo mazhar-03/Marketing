@@ -5,11 +5,12 @@ using Api.Service.Connectors;
 using Hangfire;
 using Hangfire.MemoryStorage;
 using Microsoft.EntityFrameworkCore;
-using QuestPDF.Infrastructure;
 using Npgsql;
+using QuestPDF;
+using QuestPDF.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
-QuestPDF.Settings.License = LicenseType.Community;
+Settings.License = LicenseType.Community;
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -61,7 +62,7 @@ app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseCors("AllowNextJs"); // Bunu MapControllers'dan önceye koy!
 
 app.UseHttpsRedirection();
-app.UseHangfireDashboard("/hangfire");
+app.UseHangfireDashboard();
 
 app.MapControllers();
 
@@ -72,21 +73,21 @@ using (var scope = app.Services.CreateScope())
     jobManager.AddOrUpdate<FakeDataService>(
         "fake-data-job",
         service => service.SeedAsync(),
-        "0 0 8 * * *"  // every day at 08:00
+        "0 0 8 * * *" // every day at 08:00
     );
-    
+
     jobManager.AddOrUpdate<GA4IngestionService>(
         "ga4-ingestion-job",
         service => service.RunAsync(),
-        "0 5 8 * * *"  // 08:05 — fake data 08:00, KPI 08:10
+        "0 5 8 * * *" // 08:05 — fake data 08:00, KPI 08:10
     );
 
     jobManager.AddOrUpdate<KpiService>(
         "daily-kpi-job",
         service => service.GenerateDailyKpis(DateTime.UtcNow.Date),
-        "0 10 8 * * *"  // every day at 08:10
+        "0 10 8 * * *" // every day at 08:10
     );
-    
+
     jobManager.AddOrUpdate<DataIngestionService>(
         "data-ingestion-job",
         service => service.RunAsync(),

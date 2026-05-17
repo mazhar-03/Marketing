@@ -59,12 +59,12 @@ public class KpiService
             var conversionValue = group.Sum(x => x.ConversionValue); // Yeni
 
 // Güvenli hesaplamalar (Sıfıra bölünme hatasını engelliyoruz)
-            var ctr = impressions > 0 ? ((decimal)clicks / impressions) * 100 : 0;
-            var cpc = clicks > 0 ? (spend / clicks) : 0;
-            var cpm = impressions > 0 ? ((spend / impressions) * 1000) : 0;
-            var cpv = views > 0 ? (spend / views) : 0;
-            var cpa = conversions > 0 ? (spend / conversions) : 0;
-            var roas = spend > 0 ? (conversionValue / spend) : 0;
+            var ctr = impressions > 0 ? (decimal)clicks / impressions * 100 : 0;
+            var cpc = clicks > 0 ? spend / clicks : 0;
+            var cpm = impressions > 0 ? spend / impressions * 1000 : 0;
+            var cpv = views > 0 ? spend / views : 0;
+            var cpa = conversions > 0 ? spend / conversions : 0;
+            var roas = spend > 0 ? conversionValue / spend : 0;
 
             _db.DailyKpis.Add(new DailyCampaignKPI
             {
@@ -80,7 +80,7 @@ public class KpiService
                 TotalViews = views,
                 TotalConversions = conversions,
                 ConversionValue = conversionValue,
-    
+
                 // Yüzde ve Para birimlerini genelde virgülden sonra 2 hane (Round) tutmak arayüzde rahatlatır
                 CTR = Math.Round(ctr, 2),
                 CPC = Math.Round(cpc, 2),
@@ -88,11 +88,12 @@ public class KpiService
                 CPV = Math.Round(cpv, 2),
                 CPA = Math.Round(cpa, 2),
                 ROAS = Math.Round(roas, 2),
-    
+
                 // EĞER API'den Conversion details çekersen buraya mapleyebilirsin
                 ConversionDetails = new Dictionary<string, decimal>() // Fake datada burayı dolduracağız
             });
         }
 
         await _db.SaveChangesAsync();
-    }}
+    }
+}

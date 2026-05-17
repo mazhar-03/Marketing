@@ -13,17 +13,17 @@ public class GA4DailyInsight
 
     // Engagement
     public decimal BounceRate { get; set; }
-    public decimal AvgSessionDuration { get; set; }  // seconds
+    public decimal AvgSessionDuration { get; set; } // seconds
     public long PageViews { get; set; }
 
     // Source
-    public string Source { get; set; }        // google, facebook, direct
-    public string Medium { get; set; }        // cpc, organic, referral
-    public string CampaignName { get; set; }  // UTM campaign
+    public string Source { get; set; } // google, facebook, direct
+    public string Medium { get; set; } // cpc, organic, referral
+    public string CampaignName { get; set; } // UTM campaign
 
     // Conversions
     public long Conversions { get; set; }
-    public string ConversionEventName { get; set; }  // purchase, lead, signup
+    public string ConversionEventName { get; set; } // purchase, lead, signup
 
     // Navigation property
     public Client Client { get; set; }

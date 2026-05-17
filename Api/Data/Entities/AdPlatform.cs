@@ -5,5 +5,5 @@ public enum AdPlatform
     Meta,
     GoogleAds,
     TikTok,
-    LinkedIn,
+    LinkedIn
 }

@@ -24,12 +24,12 @@ public class SeedController : ControllerBase
                 .GetRequiredService<IWebHostEnvironment>()
                 .IsDevelopment())
             return Forbid();
-        
+
         await _fakeData.SeedAsync();
         await _kpi.GenerateDailyKpis(DateTime.UtcNow.Date);
         return Ok("Seeded successfully.");
     }
-    
+
     [HttpPost("seed-kpis")]
     public async Task<IActionResult> SeedGoogle()
     {

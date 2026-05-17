@@ -1,8 +1,8 @@
-﻿namespace Api.Controller;
-
-using Api.Data;
+﻿using Api.Data;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+
+namespace Api.Controller;
 
 [ApiController]
 [Route("api/ga4")]

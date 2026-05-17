@@ -1,7 +1,8 @@
-﻿using Api.Data;
+﻿using System.Globalization;
+using Api.Data;
 using Api.Data.Entities;
-using Api.UI;
 using Microsoft.EntityFrameworkCore;
+using QuestPDF;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -11,66 +12,151 @@ namespace Api.Service;
 
 public class WeeklyReportService
 {
-    private readonly AppDbContext _db;
-
-    // Grafik tasarımlarında kullanılacak kurumsal renk paleti
-    private static readonly string[] ChartPalette = new[] 
-    { 
-        "#1a73e8", "#34a853", "#fbbc04", "#ea4335", "#9334e6", 
-        "#00acc1", "#ff6d00", "#e91e63", "#009688", "#795548" 
+    private static readonly string[] ChartPalette = new[]
+    {
+        "#1a73e8", "#34a853", "#fbbc04", "#ea4335", "#9334e6",
+        "#00acc1", "#ff6d00", "#e91e63", "#009688", "#795548"
     };
+
+    private static readonly Dictionary<string, string> MetricLabels = new()
+    {
+        ["totalSpend"] = "Spend",
+        ["totalClicks"] = "Clicks",
+        ["totalImpressions"] = "Impressions",
+        ["totalViews"] = "Views",
+        ["totalConversions"] = "Conversions",
+        ["conversionValue"] = "Conv. Value",
+        ["ctr"] = "CTR",
+        ["cpc"] = "CPC",
+        ["cpm"] = "CPM",
+        ["cpv"] = "CPV",
+        ["cpa"] = "CPA",
+        ["roas"] = "ROAS"
+    };
+
+    private readonly AppDbContext _db;
 
     public WeeklyReportService(AppDbContext db)
     {
         _db = db;
-        QuestPDF.Settings.License = LicenseType.Community;
+        Settings.License = LicenseType.Community;
     }
 
-    public async Task<byte[]> GenerateWeeklyReportAsync(int clientId, DateTime weekStart, decimal markup = 1)
+
+    public async Task<byte[]> GenerateWeeklyReportAsync(
+        int clientId,
+        DateTime weekStart,
+        decimal markup = 1,
+        List<string>? selectedMetrics = null)
     {
+        // Binlik ayırıcıyı boşluk, ondalığı virgül yapan özel kuralımız:
+        var fmt = new NumberFormatInfo
+        {
+            NumberGroupSeparator = " ",
+            NumberDecimalSeparator = ","
+        };
+
+// Kod tekrarını engellemek için mini bir yardımcı fonksiyon:
+        string FormatN(decimal v, string f = "N2")
+        {
+            return v.ToString(f, fmt);
+        }
+
+        selectedMetrics ??= new List<string> { "totalSpend", "totalClicks", "totalImpressions", "totalConversions" };
+        var metrics = selectedMetrics.Where(m => MetricLabels.ContainsKey(m)).ToList();
+
+        // +7 with < comparison = exactly 7 days including start day
         var weekEnd = weekStart.AddDays(7);
 
         var client = await _db.Clients.FindAsync(clientId)
-            ?? throw new KeyNotFoundException($"Client {clientId} not found.");
+                     ?? throw new KeyNotFoundException($"Client {clientId} not found.");
 
         var kpis = await _db.DailyKpis
             .Where(x => x.ClientId == clientId
-                     && x.Platform == AdPlatform.GoogleAds
-                     && x.Date >= weekStart
-                     && x.Date < weekEnd)
+                        && x.Platform == AdPlatform.GoogleAds
+                        && x.Date >= weekStart
+                        && x.Date < weekEnd)
             .OrderBy(x => x.Date)
             .ToListAsync();
 
-        var totalSpend       = kpis.Sum(x => x.TotalSpend) * markup;
-        var totalClicks      = kpis.Sum(x => x.TotalClicks);
+        var totalSpend = kpis.Sum(x => x.TotalSpend) * markup;
+        var totalClicks = kpis.Sum(x => x.TotalClicks);
         var totalImpressions = kpis.Sum(x => x.TotalImpressions);
         var totalConversions = kpis.Sum(x => x.TotalConversions);
-        var avgCTR           = totalImpressions > 0 ? (decimal)totalClicks / totalImpressions * 100 : 0;
-        var avgCPC           = totalClicks > 0 ? totalSpend / totalClicks : 0;
-        var avgCPM           = totalImpressions > 0 ? totalSpend / totalImpressions * 1000 : 0;
+        var avgCTR = totalImpressions > 0 ? (decimal)totalClicks / totalImpressions * 100 : 0;
+        var avgCPC = totalClicks > 0 ? totalSpend / totalClicks : 0;
+        var avgCPM = totalImpressions > 0 ? totalSpend / totalImpressions * 1000 : 0;
 
         var dailyTotals = kpis
-            .GroupBy(x => x.Date)
+            .GroupBy(x => x.Date.Date)
             .Select(g => new
             {
-                Date        = g.Key,
-                Spend       = g.Sum(x => x.TotalSpend) * markup,
-                Clicks      = g.Sum(x => x.TotalClicks),
+                Date = g.Key,
+                Spend = g.Sum(x => x.TotalSpend) * markup,
+                Clicks = g.Sum(x => x.TotalClicks),
                 Impressions = g.Sum(x => x.TotalImpressions),
-                CTR         = g.Sum(x => x.TotalImpressions) > 0
-                                ? (decimal)g.Sum(x => x.TotalClicks) / g.Sum(x => x.TotalImpressions) * 100 : 0,
-                CPC         = g.Sum(x => x.TotalClicks) > 0
-                                ? g.Sum(x => x.TotalSpend) * markup / g.Sum(x => x.TotalClicks) : 0,
+                Views = g.Sum(x => x.TotalViews),
+                Conversions = g.Sum(x => x.TotalConversions),
+                ConversionValue = g.Sum(x => x.ConversionValue),
+                CTR = g.Sum(x => x.TotalImpressions) > 0
+                    ? (decimal)g.Sum(x => x.TotalClicks) / g.Sum(x => x.TotalImpressions) * 100
+                    : 0,
+                CPC = g.Sum(x => x.TotalClicks) > 0
+                    ? g.Sum(x => x.TotalSpend) * markup / g.Sum(x => x.TotalClicks)
+                    : 0
             })
             .OrderBy(x => x.Date)
             .ToList();
 
-        // Haftanın en yüksek CTR'lı gününü bulma
-        var highestCtrDay = dailyTotals
-            .OrderByDescending(x => x.CTR)
-            .FirstOrDefault();
-        
+        var highestCtrDay = dailyTotals.Where(x => x.Impressions > 100).OrderByDescending(x => x.CTR).FirstOrDefault();
         DateTime? targetHighlightDate = highestCtrDay?.CTR > 0 ? highestCtrDay.Date : null;
+
+        string GetDailyMetricValue(string key, dynamic day)
+        {
+            decimal spend = day.Spend;
+            long clicks = day.Clicks;
+            long impressions = day.Impressions;
+            long views = day.Views;
+            decimal conversions = day.Conversions;
+            decimal convValue = day.ConversionValue;
+            return key switch
+            {
+                "totalSpend" => $"zł{FormatN(spend)}",
+                "totalClicks" => FormatN(clicks, "N0"),
+                "totalImpressions" => FormatN(impressions, "N0"),
+                "totalViews" => FormatN(views, "N0"),
+                "totalConversions" => FormatN(conversions, "N0"),
+                "conversionValue" => $"zł{FormatN(convValue)}",
+                "ctr" => impressions > 0 ? $"{FormatN((decimal)clicks / impressions * 100)}%" : "0,00%",
+                "cpc" => clicks > 0 ? $"zł{FormatN(spend / clicks)}" : "zł0,00",
+                "cpm" => impressions > 0 ? $"zł{FormatN(spend / impressions * 1000)}" : "zł0,00",
+                "cpv" => views > 0 ? $"zł{FormatN(spend / views)}" : "zł0,00",
+                "cpa" => conversions > 0 ? $"zł{FormatN(spend / conversions)}" : "zł0,00",
+                "roas" => spend > 0 ? $"{FormatN(convValue / spend)}x" : "0,00x",
+                _ => "-"
+            };
+        }
+
+        string GetCampMetricValue(string key, decimal spend, long clicks, long impressions, long views,
+            decimal conversions, decimal convValue)
+        {
+            return key switch
+            {
+                "totalSpend" => $"zł{FormatN(spend)}",
+                "totalClicks" => FormatN(clicks, "N0"),
+                "totalImpressions" => FormatN(impressions, "N0"),
+                "totalViews" => FormatN(views, "N0"),
+                "totalConversions" => FormatN(conversions, "N0"),
+                "conversionValue" => $"zł{FormatN(convValue)}",
+                "ctr" => impressions > 0 ? $"{FormatN((decimal)clicks / impressions * 100)}%" : "0,00%",
+                "cpc" => clicks > 0 ? $"zł{FormatN(spend / clicks)}" : "zł0,00",
+                "cpm" => impressions > 0 ? $"zł{FormatN(spend / impressions * 1000)}" : "zł0,00",
+                "cpv" => views > 0 ? $"zł{FormatN(spend / views)}" : "zł0,00",
+                "cpa" => conversions > 0 ? $"zł{FormatN(spend / conversions)}" : "zł0,00",
+                "roas" => spend > 0 ? $"{FormatN(convValue / spend)}x" : "0,00x",
+                _ => "-"
+            };
+        }
 
         var pdf = Document.Create(container =>
         {
@@ -97,9 +183,6 @@ public class WeeklyReportService
                                 .FontSize(10).FontColor("#888888");
                             c.Item().Text($"Generated: {DateTime.UtcNow:dd MMM yyyy HH:mm} UTC")
                                 .FontSize(9).FontColor("#aaaaaa");
-                            if (markup != 1)
-                                c.Item().Text($"Markup: ×{markup:N2}")
-                                    .FontSize(9).FontColor("#1a73e8");
                         });
                     });
                     col.Item().PaddingTop(8).LineHorizontal(1).LineColor("#1a73e8");
@@ -111,60 +194,53 @@ public class WeeklyReportService
                     col.Item().Text("Weekly summary").FontSize(13).Bold().FontColor("#333333");
                     col.Item().PaddingTop(8).Row(row =>
                     {
-                        SummaryCard(row.RelativeItem(), "Total spend",  $"${totalSpend:N2}",      "#1a73e8");
-                        row.ConstantItem(8);
-                        SummaryCard(row.RelativeItem(), "Total clicks", $"{totalClicks:N0}",       "#34a853");
-                        row.ConstantItem(8);
-                        SummaryCard(row.RelativeItem(), "Impressions",  $"{totalImpressions:N0}",  "#fbbc04");
-                        row.ConstantItem(8);
-                        SummaryCard(row.RelativeItem(), "Conversions",  $"{totalConversions:N0}",  "#ff6d00");
-                    });
-                    col.Item().PaddingTop(8).Row(row =>
-                    {
-                        SummaryCard(row.RelativeItem(), "Avg CTR", $"{avgCTR:N2}%", "#ea4335");
-                        row.ConstantItem(8);
-                        SummaryCard(row.RelativeItem(), "Avg CPC", $"${avgCPC:N2}", "#9334e6");
-                        row.ConstantItem(8);
-                        SummaryCard(row.RelativeItem(), "Avg CPM", $"${avgCPM:N2}", "#00acc1");
-                        row.ConstantItem(8);
-                        row.RelativeItem();
+                        foreach (var m in metrics)
+                        {
+                            var (label, value, color) = m switch
+                            {
+                                "totalSpend" => ("Total spend", $"zł{totalSpend:N2}", "#1a73e8"),
+                                "totalClicks" => ("Total clicks", $"{totalClicks:N0}", "#34a853"),
+                                "totalImpressions" => ("Impressions", $"{totalImpressions:N0}", "#fbbc04"),
+                                "totalConversions" => ("Conversions", $"{totalConversions:N0}", "#ff6d00"),
+                                "ctr" => ("Avg CTR", $"{avgCTR:N2}%", "#ea4335"),
+                                "cpc" => ("Avg CPC", $"zł{avgCPC:N2}", "#9334e6"),
+                                "cpm" => ("Avg CPM", $"zł{avgCPM:N2}", "#00acc1"),
+                                _ => (MetricLabels[m], "-", "#999")
+                            };
+
+                            row.RelativeItem().PaddingRight(8).Element(c => { SummaryCard(c, label, value, color); });
+                        }
                     });
 
-                    // Daily breakdown
+                    // Daily breakdown — dynamic columns
                     col.Item().PaddingTop(20).Text("Daily breakdown").FontSize(13).Bold().FontColor("#333333");
                     col.Item().PaddingTop(8).Table(table =>
                     {
                         table.ColumnsDefinition(cols =>
                         {
                             cols.RelativeColumn(2.5f);
-                            cols.RelativeColumn(2);
-                            cols.RelativeColumn(1.5f);
-                            cols.RelativeColumn(2);
-                            cols.RelativeColumn(1.5f);
-                            cols.RelativeColumn(1.5f);
+                            foreach (var _ in metrics) cols.RelativeColumn(2f);
                         });
                         table.Header(h =>
                         {
-                            foreach (var t in new[] { "Date", "Spend", "Clicks", "Impressions", "CTR", "CPC" })
-                                h.Cell().Element(c => HeaderCell(c, t));
+                            h.Cell().Element(c => HeaderCell(c, "Date"));
+                            foreach (var m in metrics)
+                                h.Cell().Element(c => HeaderCell(c, MetricLabels[m]));
                         });
                         var odd = false;
                         foreach (var day in dailyTotals)
                         {
-                            var isHighestCtr = targetHighlightDate.HasValue && day.Date.Date == targetHighlightDate.Value.Date;
-                            var bg = isHighestCtr ? "#fff2cc" : (odd ? "#f8f9fa" : "#ffffff");
-                            
+                            var isHighestCtr = targetHighlightDate.HasValue &&
+                                               day.Date.Date == targetHighlightDate.Value.Date;
+                            var bg = isHighestCtr ? "#fff2cc" : odd ? "#f8f9fa" : "#ffffff";
                             DataCell(table, day.Date.ToString("ddd dd MMM"), bg);
-                            DataCell(table, $"${day.Spend:N2}", bg);
-                            DataCell(table, $"{day.Clicks:N0}", bg);
-                            DataCell(table, $"{day.Impressions:N0}", bg);
-                            DataCell(table, $"{day.CTR:N2}%", bg);
-                            DataCell(table, $"${day.CPC:N2}", bg);
+                            foreach (var m in metrics)
+                                DataCell(table, GetDailyMetricValue(m, day), bg);
                             odd = !odd;
                         }
                     });
 
-                    // Hiyerarşik Veri Gruplama
+                    // Hierarchical campaign/adset/ad breakdown
                     var campaignGroups = kpis
                         .GroupBy(x => x.CampaignName)
                         .Select(campGroup => new
@@ -173,11 +249,15 @@ public class WeeklyReportService
                             Spend = campGroup.Sum(x => x.TotalSpend) * markup,
                             Clicks = campGroup.Sum(x => x.TotalClicks),
                             Impressions = campGroup.Sum(x => x.TotalImpressions),
+                            Views = campGroup.Sum(x => x.TotalViews),
                             Conversions = campGroup.Sum(x => x.TotalConversions),
+                            ConversionValue = campGroup.Sum(x => x.ConversionValue),
                             Adsets = campGroup.GroupBy(x => x.AdsetName)
-                                .Select(adsetGroup => {
+                                .Select(adsetGroup =>
+                                {
                                     var rawAds = adsetGroup.GroupBy(x => x.AdName)
-                                        .Select(adGroup => {
+                                        .Select(adGroup =>
+                                        {
                                             var imps = adGroup.Sum(x => x.TotalImpressions);
                                             var clks = adGroup.Sum(x => x.TotalClicks);
                                             return new
@@ -186,7 +266,9 @@ public class WeeklyReportService
                                                 Spend = adGroup.Sum(x => x.TotalSpend) * markup,
                                                 Clicks = clks,
                                                 Impressions = imps,
+                                                Views = adGroup.Sum(x => x.TotalViews),
                                                 Conversions = adGroup.Sum(x => x.TotalConversions),
+                                                ConversionValue = adGroup.Sum(x => x.ConversionValue),
                                                 CTR = imps > 0 ? (decimal)clks / imps * 100 : 0
                                             };
                                         })
@@ -201,7 +283,9 @@ public class WeeklyReportService
                                         Spend = adsetGroup.Sum(x => x.TotalSpend) * markup,
                                         Clicks = adsetGroup.Sum(x => x.TotalClicks),
                                         Impressions = adsetGroup.Sum(x => x.TotalImpressions),
+                                        Views = adsetGroup.Sum(x => x.TotalViews),
                                         Conversions = adsetGroup.Sum(x => x.TotalConversions),
+                                        ConversionValue = adsetGroup.Sum(x => x.ConversionValue),
                                         TopCtrAdName = topCtrAdName,
                                         Ads = rawAds
                                     };
@@ -212,136 +296,174 @@ public class WeeklyReportService
                         .OrderByDescending(x => x.Spend)
                         .ToList();
 
-                    // ================= 1. ONE PIE CHART FOR CAMPAIGNS OVERALL =================
-                    col.Item().PaddingTop(24).Text("Campaign Performance & Visual Analytics").FontSize(14).Bold().FontColor("#1a73e8");
-                    
+                    // Overall campaign pie chart
+                    col.Item().PaddingTop(24).Text("Campaign Performance & Visual Analytics").FontSize(14).Bold()
+                        .FontColor("#1a73e8");
+
+// Genel toplamı legend'da yüzde göstermek için hesaplıyoruz
+                    var overallTotalSpend = campaignGroups.Sum(c => c.Spend);
+
                     var campaignSlices = campaignGroups
                         .Select((c, idx) => (c.CampaignName, c.Spend, ChartPalette[idx % ChartPalette.Length]))
                         .ToList();
                     var campaignChartBytes = GeneratePieChart(campaignSlices);
 
-                    col.Item().PaddingTop(8).Border(1).BorderColor("#e0e0e0").Background("#fafafa").Padding(12).Row(chartRow =>
-                    {
-                        chartRow.RelativeItem().Column(c =>
-                        {
-                            c.Item().Text("Overall Campaign Budget Share").FontSize(11).Bold().FontColor("#333333");
-                            c.Item().PaddingTop(2).Text("Proportional spend distribution across all active Google Ads campaigns.").FontSize(8.5f).FontColor("#666666");
-                            
-                            c.Item().PaddingTop(8).Column(legendCol =>
+// Ana kampanya grafiğini bölmemesi için ShowEntire() ekleyebiliriz (isteğe bağlı ama faydalı)
+                    col.Item().ShowEntire().PaddingTop(8).Border(1).BorderColor("#e0e0e0").Background("#fafafa")
+                        .Padding(12).Row(
+                            chartRow =>
                             {
-                                int idx = 0;
-                                foreach (var camp in campaignGroups)
+                                chartRow.RelativeItem().Column(c =>
                                 {
-                                    var clr = ChartPalette[idx % ChartPalette.Length];
-                                    legendCol.Item().PaddingTop(2).Row(r =>
+                                    c.Item().Text("Overall Campaign Budget Share").FontSize(11).Bold()
+                                        .FontColor("#333333");
+                                    c.Item().PaddingTop(2)
+                                        .Text("Proportional spend distribution across all active Google Ads campaigns.")
+                                        .FontSize(8.5f).FontColor("#666666");
+                                    c.Item().PaddingTop(8).Column(legendCol =>
                                     {
-                                        r.ConstantItem(8).AlignMiddle().Height(8).Background(clr);
-                                        r.ConstantItem(6);
-                                        r.RelativeItem().Text($"{camp.CampaignName}: ${camp.Spend:N2}").FontSize(8.5f).FontColor("#444444");
-                                    });
-                                    idx++;
-                                }
-                            });
-                        });
-                        chartRow.ConstantItem(110).Height(110).Image(campaignChartBytes).FitArea();
-                    });
+                                        var idx = 0;
+                                        foreach (var camp in campaignGroups)
+                                        {
+                                            var clr = ChartPalette[idx % ChartPalette.Length];
+                                            var campPct = overallTotalSpend > 0
+                                                ? camp.Spend / overallTotalSpend * 100
+                                                : 0; // Legend için Yüzde
 
-                    // ================= 2. EXCEL PIVOT TABLE WITH INLINE ADSET PIE CHARTS =================
+                                            legendCol.Item().PaddingTop(2).Row(r =>
+                                            {
+                                                r.ConstantItem(8).AlignMiddle().Height(8).Background(clr);
+                                                r.ConstantItem(6);
+                                                r.RelativeItem()
+                                                    .Text(
+                                                        $"{camp.CampaignName}: zł{FormatN(camp.Spend)} ({campPct:0.0}%)") // {camp.Spend:N2} yerine FormatN()
+                                                    .FontSize(8.5f).FontColor("#444444");
+                                            });
+                                            idx++;
+                                        }
+                                    });
+                                });
+                                chartRow.ConstantItem(110).Height(110).Image(campaignChartBytes).FitArea();
+                            });
+
+// Pivot table with dynamic metric columns + inline adset pie charts
                     col.Item().PaddingTop(16).Table(pivotTable =>
                     {
                         pivotTable.ColumnsDefinition(cols =>
                         {
                             cols.RelativeColumn(4.5f);
-                            cols.RelativeColumn(1.8f);
-                            cols.RelativeColumn(1.2f);
-                            cols.RelativeColumn(1.5f);
-                            cols.RelativeColumn(1f);
+                            foreach (var _ in metrics) cols.RelativeColumn(1.8f);
                         });
 
                         pivotTable.Header(h =>
                         {
                             h.Cell().Background("#1a73e8").Padding(6).Text("Marketing Structure").FontSize(9).Bold().FontColor("#ffffff");
-                            h.Cell().Background("#1a73e8").Padding(6).Text("Spend").FontSize(9).Bold().FontColor("#ffffff");
-                            h.Cell().Background("#1a73e8").Padding(6).Text("Clicks").FontSize(9).Bold().FontColor("#ffffff");
-                            h.Cell().Background("#1a73e8").Padding(6).Text("Impressions").FontSize(9).Bold().FontColor("#ffffff");
-                            h.Cell().Background("#1a73e8").Padding(6).Text("Conv.").FontSize(9).Bold().FontColor("#ffffff");
+                            foreach (var m in metrics)
+                                h.Cell().Background("#1a73e8").Padding(6).Text(MetricLabels[m]).FontSize(9).Bold().FontColor("#ffffff");
                         });
+
+                        bool isFirstCamp = true;
 
                         foreach (var camp in campaignGroups)
                         {
-                            // Kampanya Başlık Satırı
-                            var campBg = "#e8f0fe"; 
-                            pivotTable.Cell().Background(campBg).BorderBottom(1).BorderColor("#b0c4de").Padding(6).PaddingLeft(6)
-                                .Text(camp.CampaignName).FontSize(10).Bold().FontColor("#1a73e8");
-                            pivotTable.Cell().Background(campBg).BorderBottom(1).BorderColor("#b0c4de").Padding(6)
-                                .Text($"${camp.Spend:N2}").FontSize(10).Bold().FontColor("#1a73e8");
-                            pivotTable.Cell().Background(campBg).BorderBottom(1).BorderColor("#b0c4de").Padding(6)
-                                .Text(camp.Clicks.ToString("N0")).FontSize(10).Bold().FontColor("#1a73e8");
-                            pivotTable.Cell().Background(campBg).BorderBottom(1).BorderColor("#b0c4de").Padding(6)
-                                .Text(camp.Impressions.ToString("N0")).FontSize(10).Bold().FontColor("#1a73e8");
-                            pivotTable.Cell().Background(campBg).BorderBottom(1).BorderColor("#b0c4de").Padding(6)
-                                .Text(camp.Conversions.ToString("N0")).FontSize(10).Bold().FontColor("#1a73e8");
+                            if (!isFirstCamp)
+                            {
+                                pivotTable.Cell()
+                                    .ColumnSpan((uint)(1 + metrics.Count))
+                                    .MinHeight(36) // <-- Arayı 18 birim açar
+                                    .Background("#ffffff"); // Beyaz arka plan ile temiz bir boşluk yaratır
+                            }
+                            isFirstCamp = false;
 
-                            // PIE CHART SHOWING EFFICIENCIES BETWEEN ADSETS FOR EACH CAMPAIGN
+                            var campBg = "#e8f0fe";
+                            pivotTable.Cell().Background(campBg).BorderBottom(1).BorderColor("#b0c4de").Padding(6)
+                                .PaddingLeft(6)
+                                .Text(camp.CampaignName).FontSize(10).Bold().FontColor("#1a73e8");
+
+                            foreach (var m in metrics)
+                                pivotTable.Cell().Background(campBg).BorderBottom(1).BorderColor("#b0c4de").Padding(6)
+                                    .Text(GetCampMetricValue(m, camp.Spend, camp.Clicks, camp.Impressions, camp.Views,
+                                        camp.Conversions, camp.ConversionValue))
+                                    .FontSize(10).Bold().FontColor("#1a73e8");
+
                             var adsetSlices = camp.Adsets
                                 .Select((a, idx) => (a.AdsetName, a.Spend, ChartPalette[idx % ChartPalette.Length]))
                                 .ToList();
                             var adsetChartBytes = GeneratePieChart(adsetSlices);
 
-                            pivotTable.Cell().ColumnSpan(5).Background("#ffffff").BorderBottom(0.5f).BorderColor("#e0e0e0").Padding(8).PaddingLeft(18).Row(chartRow =>
-                            {
-                                chartRow.RelativeItem().Column(c =>
+                            // DİKKAT: .ShowEntire() ekledik! Bu sayede bu Adset grafiği bulunduğu hücreyle birlikte asla ortadan ikiye sayfa arasına kırılmaz.
+                            pivotTable.Cell().ColumnSpan((uint)(1 + metrics.Count))
+                                .ShowEntire()
+                                .Background("#ffffff").BorderBottom(0.5f).BorderColor("#e0e0e0")
+                                .Padding(8).PaddingLeft(18).Row(chartRow =>
                                 {
-                                    c.Item().Text("Adset Bütçe Dağılım Payı").FontSize(8.5f).Bold().FontColor("#555555");
-                                    int colorIdx = 0;
-                                    foreach (var adset in camp.Adsets)
+                                    chartRow.RelativeItem().Column(c =>
                                     {
-                                        var clr = ChartPalette[colorIdx % ChartPalette.Length];
-                                        c.Item().PaddingTop(2).Row(r =>
+                                        // TÜRKÇE METİN İNGİLİZCEYE ÇEVRİLDİ
+                                        c.Item().Text("Adset Budget Distribution Share").FontSize(8.5f).Bold()
+                                            .FontColor("#555555");
+                                        var colorIdx = 0;
+
+                                        var totalAdsetSpend = camp.Adsets.Sum(a => a.Spend);
+
+                                        foreach (var adset in camp.Adsets)
                                         {
-                                            r.ConstantItem(6).AlignMiddle().Height(6).Background(clr);
-                                            r.ConstantItem(4);
-                                            r.RelativeItem().Text($"{adset.AdsetName}: ${adset.Spend:N2}").FontSize(7.5f).FontColor("#666666");
-                                        });
-                                        colorIdx++;
-                                    }
+                                            var clr = ChartPalette[colorIdx % ChartPalette.Length];
+                                            var adsetPct = totalAdsetSpend > 0
+                                                ? adset.Spend / totalAdsetSpend * 100
+                                                : 0;
+
+                                            c.Item().PaddingTop(2).Row(r =>
+                                            {
+                                                r.ConstantItem(6).AlignMiddle().Height(6).Background(clr);
+                                                r.ConstantItem(4);
+                                                r.RelativeItem()
+                                                    .Text(
+                                                        $"{adset.AdsetName}: zł{FormatN(adset.Spend)} ({adsetPct:0.0}%)")
+                                                    .FontSize(7.5f).FontColor("#666666");
+                                            });
+                                            colorIdx++;
+                                        }
+                                    });
+                                    chartRow.ConstantItem(70).Height(70).Image(adsetChartBytes).FitArea();
                                 });
-                                chartRow.ConstantItem(70).Height(70).Image(adsetChartBytes).FitArea();
-                            });
 
                             foreach (var adset in camp.Adsets)
                             {
-                                // Adset Satırı
                                 var adsetBg = "#f4f9f4";
-                                pivotTable.Cell().Background(adsetBg).BorderBottom(0.5f).BorderColor("#d0d0d0").Padding(5).PaddingLeft(18)
+
+                                // Satırların bölünmesini engellemek için ShowEntire kullanıyoruz
+                                pivotTable.Cell().ShowEntire().Background(adsetBg).BorderBottom(0.5f)
+                                    .BorderColor("#d0d0d0")
+                                    .Padding(5).PaddingLeft(18)
                                     .Text($"• {adset.AdsetName}").FontSize(9).Bold().FontColor("#2e7d32");
-                                pivotTable.Cell().Background(adsetBg).BorderBottom(0.5f).BorderColor("#d0d0d0").Padding(5)
-                                    .Text($"${adset.Spend:N2}").FontSize(9).Bold().FontColor("#2e7d32");
-                                pivotTable.Cell().Background(adsetBg).BorderBottom(0.5f).BorderColor("#d0d0d0").Padding(5)
-                                    .Text(adset.Clicks.ToString("N0")).FontSize(9).Bold().FontColor("#2e7d32");
-                                pivotTable.Cell().Background(adsetBg).BorderBottom(0.5f).BorderColor("#d0d0d0").Padding(5)
-                                    .Text(adset.Impressions.ToString("N0")).FontSize(9).Bold().FontColor("#2e7d32");
-                                pivotTable.Cell().Background(adsetBg).BorderBottom(0.5f).BorderColor("#d0d0d0").Padding(5)
-                                    .Text(adset.Conversions.ToString("N0")).FontSize(9).Bold().FontColor("#2e7d32");
+
+                                foreach (var m in metrics)
+                                    pivotTable.Cell().ShowEntire().Background(adsetBg).BorderBottom(0.5f)
+                                        .BorderColor("#d0d0d0")
+                                        .Padding(5)
+                                        .Text(GetCampMetricValue(m, adset.Spend, adset.Clicks, adset.Impressions,
+                                            adset.Views, adset.Conversions, adset.ConversionValue))
+                                        .FontSize(9).Bold().FontColor("#2e7d32");
 
                                 foreach (var ad in adset.Ads)
                                 {
-                                    // CHOOSE HIGHEST CTR AD UNDER EACH ADSET AND COLOR IT YELLOW (#fff2cc)
                                     var isHighestInAdset = adset.TopCtrAdName == ad.AdName && ad.CTR > 0;
-                                    
                                     var adBg = isHighestInAdset ? "#fff2cc" : "#ffffff";
                                     var adFore = isHighestInAdset ? "#b8860b" : "#555555";
 
-                                    pivotTable.Cell().Background(adBg).BorderBottom(0.5f).BorderColor("#e0e0e0").Padding(4).PaddingLeft(30)
+                                    pivotTable.Cell().ShowEntire().Background(adBg).BorderBottom(0.5f)
+                                        .BorderColor("#e0e0e0")
+                                        .Padding(4).PaddingLeft(30)
                                         .Text($"- {ad.AdName}").FontSize(8.5f).FontColor(adFore);
-                                    pivotTable.Cell().Background(adBg).BorderBottom(0.5f).BorderColor("#e0e0e0").Padding(4)
-                                        .Text($"${ad.Spend:N2}").FontSize(8.5f).FontColor(adFore);
-                                    pivotTable.Cell().Background(adBg).BorderBottom(0.5f).BorderColor("#e0e0e0").Padding(4)
-                                        .Text(ad.Clicks.ToString("N0")).FontSize(8.5f).FontColor(adFore);
-                                    pivotTable.Cell().Background(adBg).BorderBottom(0.5f).BorderColor("#e0e0e0").Padding(4)
-                                        .Text(ad.Impressions.ToString("N0")).FontSize(8.5f).FontColor(adFore);
-                                    pivotTable.Cell().Background(adBg).BorderBottom(0.5f).BorderColor("#e0e0e0").Padding(4)
-                                        .Text(ad.Conversions.ToString("N0")).FontSize(8.5f).FontColor(adFore);
+
+                                    foreach (var m in metrics)
+                                        pivotTable.Cell().ShowEntire().Background(adBg).BorderBottom(0.5f)
+                                            .BorderColor("#e0e0e0")
+                                            .Padding(4)
+                                            .Text(GetCampMetricValue(m, ad.Spend, ad.Clicks, ad.Impressions, ad.Views,
+                                                ad.Conversions, ad.ConversionValue))
+                                            .FontSize(8.5f).FontColor(adFore);
                                 }
                             }
                         }
@@ -361,17 +483,14 @@ public class WeeklyReportService
         return pdf.GeneratePdf();
     }
 
-    // ================= SKIASHARP DYNAMIC PIE CHART GENERATOR =================
     private static byte[] GeneratePieChart(List<(string Label, decimal Value, string ColorHex)> slices)
     {
-        int width = 240;
-        int height = 240;
+        int width = 240, height = 240;
         using var bitmap = new SKBitmap(width, height);
         using var canvas = new SKCanvas(bitmap);
         canvas.Clear(SKColors.Transparent);
 
-        decimal total = slices.Sum(s => s.Value);
-
+        var total = slices.Sum(s => s.Value);
         if (total == 0)
         {
             using var paint = new SKPaint { Color = SKColors.LightGray, IsAntialias = true, Style = SKPaintStyle.Fill };
@@ -382,21 +501,49 @@ public class WeeklyReportService
         }
 
         var rect = new SKRect(8, 8, width - 8, height - 8);
-        float startAngle = -90f; // Saat 12 yönünden başlaması için
+        var startAngle = -90f;
+        var cx = width / 2f;
+        var cy = height / 2f;
+        var radius = (width - 16) / 2f;
+
+        // Grafik dilimlerinin içine yazılacak yüzde metninin ayarı (Koyu renk ve kalın)
+// GeneratePieChart içindeki textPaint ayarını şöyle güncelle:
+        using var textPaint = new SKPaint
+        {
+            Color = SKColor.Parse("#222222"), 
+            IsAntialias = true,
+            TextSize = 15f, // <-- 13f'den 17f'ye çıkardık, artık çok daha belirgin olacak
+            FakeBoldText = true,
+            TextAlign = SKTextAlign.Center
+        };
 
         foreach (var slice in slices)
         {
             if (slice.Value == 0) continue;
-            float sweepAngle = (float)(slice.Value / total) * 360f;
+            var sweepAngle = (float)(slice.Value / total) * 360f;
 
+            // 1. Önce dilimi çiziyoruz
             using var paint = new SKPaint
-            {
-                Color = SKColor.Parse(slice.ColorHex),
-                IsAntialias = true,
-                Style = SKPaintStyle.Fill
-            };
-
+                { Color = SKColor.Parse(slice.ColorHex), IsAntialias = true, Style = SKPaintStyle.Fill };
             canvas.DrawArc(rect, startAngle, sweepAngle, true, paint);
+
+            // 2. Yüzdeyi hesapla ve grafiğin içine yaz
+            var pct = slice.Value / total * 100;
+
+            // Sadece %5'ten büyük dilimlere yazı yazdırıyoruz ki küçük dilimlerde yazılar üst üste binip çirkin durmasın
+            if (pct >= 5m)
+            {
+                var midAngle = startAngle + sweepAngle / 2f;
+                var rad = midAngle * Math.PI / 180.0;
+                var textRadius = radius * 0.65f; // Metni merkezin %65 uzağına yerleştirir
+
+                var textX = cx + textRadius * (float)Math.Cos(rad);
+                var textY = cy + textRadius * (float)Math.Sin(rad) + 5f; // +5 dikey ortalama ayarı
+
+                // Yazıyı yazıyoruz (Eğer bir önceki formatlama fonksiyonunu tanımladıysan {FormatN(pct)} de diyebilirsin)
+                canvas.DrawText($"{pct:0.0}%", textX, textY, textPaint);
+            }
+
             startAngle += sweepAngle;
         }
 
